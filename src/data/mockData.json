@@ -1,0 +1,43 @@
+{
+  "weather": {
+    "temperature": "28°C",
+    "humidity": "65%",
+    "rainChance": "20%",
+    "condition": "Partly Cloudy"
+  },
+  "crops": [
+    { "id": 1, "soilType": "Black", "season": "Monsoon", "recommendations": ["Cotton", "Soybean", "Tur (Pigeon Pea)"] },
+    { "id": 2, "soilType": "Red", "season": "Monsoon", "recommendations": ["Groundnut", "Castor seed", "Millets"] },
+    { "id": 3, "soilType": "Alluvial", "season": "Winter", "recommendations": ["Wheat", "Mustard", "Gram"] },
+    { "id": 4, "soilType": "Black", "season": "Winter", "recommendations": ["Chickpea", "Safflower", "Linseed"] }
+  ],
+  "pests": [
+    {
+      "id": "p1",
+      "name": "Fall Armyworm",
+      "crop": "Maize",
+      "severity": "High",
+      "advice": "Use appropriate bio-pesticides and monitor the field."
+    },
+    {
+      "id": "p2",
+      "name": "Aphids",
+      "crop": "Cotton",
+      "severity": "Medium",
+      "advice": "Spray neem oil solution early morning or late evening."
+    },
+    {
+      "id": "p3",
+      "name": "Whitefly",
+      "crop": "Vegetables",
+      "severity": "High",
+      "advice": "Deploy yellow sticky traps and apply insecticidal soap."
+    }
+  ],
+  "marketPrices": [
+    { "id": "m1", "crop": "Wheat", "price": "₹2,200 / Quintal", "trend": "Up" },
+    { "id": "m2", "crop": "Rice", "price": "₹2,800 / Quintal", "trend": "Stable" },
+    { "id": "m3", "crop": "Cotton", "price": "₹7,500 / Quintal", "trend": "Down" },
+    { "id": "m4", "crop": "Soybean", "price": "₹4,600 / Quintal", "trend": "Up" }
+  ]
+}
