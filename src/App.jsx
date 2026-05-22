@@ -12,7 +12,7 @@ const AppLayout = () => {
 
   return (
     <div className="app">
-      <Navbar />
+      {!isLoginPage && <Navbar />}
       <div className="app-body">
         {!isLoginPage && <Sidebar />}
         <main className={`main-content ${isLoginPage ? 'full-width' : ''}`}>

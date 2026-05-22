@@ -17,9 +17,10 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = (username, password) => {
-    // Mock login logic
-    if (username === 'admin' && password === '12345') {
-      localStorage.setItem('mock_jwt_token', 'fake-jwt-token-xyz');
+    // Mock login logic: Allow any non-empty username/password to login
+    if (username && password) {
+      localStorage.setItem('mock_jwt_token', `fake-jwt-token-${username}`);
+      localStorage.setItem('current_username', username);
       setIsAuthenticated(true);
       return true;
     }
