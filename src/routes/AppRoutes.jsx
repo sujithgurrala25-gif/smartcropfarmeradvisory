@@ -7,6 +7,7 @@ import CropRecommendation from '../pages/CropRecommendation';
 import PestAlert from '../pages/PestAlert';
 import MarketPrice from '../pages/MarketPrice';
 import Feedback from '../pages/Feedback';
+import NotFound from '../pages/NotFound';
 
 const AppRoutes = () => {
   return (
@@ -24,7 +25,7 @@ const AppRoutes = () => {
         <Route path="/feedback" element={<Feedback />} />
       </Route>
       
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };

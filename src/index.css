@@ -376,3 +376,63 @@ h2 {
 .feedback-item small {
   color: var(--text-muted);
 }
+
+/* 404 Page Styles */
+.not-found-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  width: 100%;
+  padding: 2rem;
+}
+
+.not-found-card {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: var(--shadow-md);
+  padding: 3rem 2rem;
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+  transition: var(--transition);
+}
+
+.not-found-icon {
+  font-size: 4rem;
+  margin-bottom: 1.5rem;
+  animation: float-animation 3s ease-in-out infinite;
+}
+
+@keyframes float-animation {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.not-found-title {
+  font-size: 6rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--primary-color);
+  margin-bottom: 0.5rem;
+}
+
+.not-found-subtitle {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--text-color);
+}
+
+.not-found-text {
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  margin-bottom: 2rem;
+  line-height: 1.6;
+}
+
+.not-found-btn {
+  font-size: 1.1rem;
+  padding: 0.75rem 2rem;
+}

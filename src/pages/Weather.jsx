@@ -10,7 +10,7 @@ const Weather = () => {
 
   useEffect(() => {
     let isMounted = true;
-    
+
     const getWeatherData = async () => {
       try {
         setLoading(true);
@@ -41,9 +41,9 @@ const Weather = () => {
     <div className="page-container">
       <h2>Weather Updates</h2>
       {error && <p className="error-message">{error}</p>}
-      
+
       <Loader loading={loading} message="Fetching latest weather data..." />
-      
+
       {!loading && weatherData && (
         <div className="weather-container">
           <WeatherCard data={weatherData} />
