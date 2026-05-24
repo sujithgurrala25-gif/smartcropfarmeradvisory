@@ -17,12 +17,44 @@ const Weather = () => {
     try {
       setLoading(true);
       setError(null);
+      
+      let finalLabel = label;
+      if (label === 'Your Current Location') {
+        try {
+          const geoResponse = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`);
+          if (geoResponse.ok) {
+            const geoData = await geoResponse.json();
+            const town = geoData.localityName || geoData.locality || '';
+            const city = geoData.city || '';
+            const state = geoData.principalSubdivision || '';
+            const country = geoData.countryName || '';
+            
+            const parts = [];
+            if (town) parts.push(town);
+            if (city && city.toLowerCase() !== town.toLowerCase()) parts.push(city);
+            if (state) parts.push(state);
+            if (country) parts.push(country);
+
+            if (parts.length > 0) {
+              finalLabel = `Current Location: ${parts.join(', ')}`;
+            } else {
+              finalLabel = `Current Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+            }
+          } else {
+            finalLabel = `Current Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+          }
+        } catch (geoErr) {
+          console.warn('Reverse geocoding error:', geoErr);
+          finalLabel = `Current Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+        }
+      }
+
       const data = await fetchWeather(lat, lon);
       setWeatherData(data);
       setCoordinates({ lat, lon });
       setLastUpdated(new Date().toLocaleTimeString());
-      if (label) {
-        setLocationName(label);
+      if (finalLabel) {
+        setLocationName(finalLabel);
       }
     } catch {
       setError('Failed to fetch real-time weather data.');

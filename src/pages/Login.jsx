@@ -4,25 +4,60 @@ import { AuthContext } from "../context/AuthContext";
 import "./Login.css";
 
 const Login = () => {
+  const [mode, setMode] = useState("login"); // 'login' or 'register'
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
-  const { login } = useContext(AuthContext);
+  const { login, register, isFirebase } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleToggleMode = (newMode) => {
+    setMode(newMode);
+    setError("");
+    setSuccessMsg("");
+    setUsername("");
+    setPassword("");
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!username || !password) {
+    setError("");
+    setSuccessMsg("");
+
+    if (!username.trim() || !password) {
       setError("Please fill in all fields.");
       return;
     }
 
-    const success = login(username, password);
-    if (success) {
-      navigate("/dashboard");
+    if (mode === "login") {
+      const result = await login(username, password);
+      if (result.success) {
+        navigate("/dashboard");
+      } else {
+        if (result.code === "USER_NOT_FOUND") {
+          setError(
+            isFirebase
+              ? "Account not found. Please click 'Register' to sign up."
+              : "Account not found. Please switch to the 'Register' tab to create your account."
+          );
+        } else {
+          setError(result.message);
+        }
+      }
     } else {
-      setError("Invalid credentials.");
+      const result = await register(username, password);
+      if (result.success) {
+        setSuccessMsg(result.message);
+        // Switch to login tab after brief delay
+        setTimeout(() => {
+          setMode("login");
+          setError("");
+        }, 1500);
+      } else {
+        setError(result.message);
+      }
     }
   };
 
@@ -31,22 +66,59 @@ const Login = () => {
       <div className="login-glass-card">
         <div className="login-header">
           <div className="login-logo">🌾</div>
-          <h2 className="login-title">Welcome Back</h2>
-          <p className="login-subtitle">Smart Farmer Advisory System</p>
+          <h2 className="login-title">Smart Farmer Advisory</h2>
+          <p className="login-subtitle">Agricultural Insights & Mandi Market Rates</p>
+          
+          <div style={{ 
+            display: 'inline-flex', 
+            alignItems: 'center', 
+            gap: '0.4rem', 
+            marginTop: '0.75rem',
+            padding: '0.3rem 0.6rem', 
+            borderRadius: '20px', 
+            backgroundColor: isFirebase ? 'rgba(56, 142, 60, 0.08)' : 'rgba(245, 127, 23, 0.08)', 
+            border: `1px solid ${isFirebase ? '#388e3c' : '#f57f17'}`, 
+            fontSize: '0.72rem', 
+            fontWeight: '600', 
+            color: isFirebase ? '#2e7d32' : '#e65100' 
+          }}>
+            <span className={isFirebase ? "live-pulse" : ""} style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: isFirebase ? '#388e3c' : '#f57f17', display: 'inline-block' }}></span>
+            {isFirebase ? 'Firebase Auth Mode Active' : 'Offline Local Fallback (Configure env for Firebase)'}
+          </div>
+        </div>
+
+        {/* Form Selector Tabs */}
+        <div className="auth-tabs">
+          <button 
+            type="button" 
+            className={`auth-tab-btn ${mode === 'login' ? 'active' : ''}`}
+            onClick={() => handleToggleMode('login')}
+          >
+            Sign In
+          </button>
+          <button 
+            type="button" 
+            className={`auth-tab-btn ${mode === 'register' ? 'active' : ''}`}
+            onClick={() => handleToggleMode('register')}
+          >
+            Register
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">
           {error && <div className="error-badge">{error}</div>}
+          {successMsg && <div className="success-badge">{successMsg}</div>}
 
           <div className="modern-form-group">
-            <label htmlFor="username">Username</label>
+            <label htmlFor="username">{isFirebase ? 'Email Address' : 'Username'}</label>
             <input
               type="text"
               id="username"
               className="modern-input"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your username"
+              placeholder={isFirebase ? "Enter your email" : "Enter your username"}
+              autoComplete="username"
             />
           </div>
 
@@ -59,13 +131,42 @@ const Login = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
+              autoComplete="current-password"
             />
           </div>
 
           <button type="submit" className="modern-btn">
-            Sign In
+            {mode === 'login' ? 'Sign In' : 'Create Account'}
           </button>
         </form>
+
+        <div className="mode-toggle-link" style={{ marginTop: '1.5rem', fontSize: '0.9rem' }}>
+          {mode === 'login' ? (
+            <span>
+              New to Smart Farmer?{' '}
+              <button 
+                type="button" 
+                className="link-btn"
+                onClick={() => handleToggleMode('register')}
+                style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', fontWeight: 'bold', textDecoration: 'underline' }}
+              >
+                Register here
+              </button>
+            </span>
+          ) : (
+            <span>
+              Already have an account?{' '}
+              <button 
+                type="button" 
+                className="link-btn"
+                onClick={() => handleToggleMode('login')}
+                style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', fontWeight: 'bold', textDecoration: 'underline' }}
+              >
+                Sign In here
+              </button>
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
