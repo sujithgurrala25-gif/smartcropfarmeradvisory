@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { fetchPests } from '../utils/api';
-import { isGeminiConfigured, analyzePestPhoto } from '../utils/gemini';
+import { isGeminiConfigured, analyzePestPhoto, testGeminiApiKey } from '../utils/gemini';
 import Loader from '../components/Loader';
 import PestCard from '../components/PestCard';
 
@@ -19,7 +19,55 @@ const PestAlert = () => {
   const [scanError, setScanError] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
 
+  // Gemini API Key state
+  const [geminiConfigured, setGeminiConfigured] = useState(isGeminiConfigured());
+  const [showConfig, setShowConfig] = useState(false);
+  const [tempApiKey, setTempApiKey] = useState("");
+  const [showApiKeyText, setShowApiKeyText] = useState(false);
+  const [isValidatingKey, setIsValidatingKey] = useState(false);
+  const [configFeedback, setConfigFeedback] = useState(null);
+
   const fileInputRef = useRef(null);
+
+  // Load API key from local storage on mount
+  useEffect(() => {
+    const key = localStorage.getItem("VITE_GEMINI_API_KEY") || "";
+    setTempApiKey(key);
+  }, []);
+
+  const handleSaveApiKey = async () => {
+    if (!tempApiKey.trim()) {
+      setConfigFeedback({ type: 'error', message: 'Please enter a valid key.' });
+      return;
+    }
+    
+    setIsValidatingKey(true);
+    setConfigFeedback(null);
+    try {
+      await testGeminiApiKey(tempApiKey.trim());
+      localStorage.setItem("VITE_GEMINI_API_KEY", tempApiKey.trim());
+      setGeminiConfigured(true);
+      setConfigFeedback({ type: 'success', message: 'Gemini API key verified and saved!' });
+      setTimeout(() => {
+        setShowConfig(false);
+        setConfigFeedback(null);
+      }, 1500);
+    } catch (err) {
+      setConfigFeedback({ type: 'error', message: `Verification failed: ${err.message}` });
+    } finally {
+      setIsValidatingKey(false);
+    }
+  };
+
+  const handleClearApiKey = () => {
+    localStorage.removeItem("VITE_GEMINI_API_KEY");
+    setTempApiKey("");
+    setGeminiConfigured(false);
+    setConfigFeedback({ type: 'success', message: 'API key cleared. Offline simulation active.' });
+    setTimeout(() => {
+      setConfigFeedback(null);
+    }, 2000);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -107,9 +155,15 @@ const PestAlert = () => {
       setIsScanning(true);
       setScanError("");
       const result = await analyzePestPhoto(imageBase64, imageMimeType);
-      setScanResult(result);
+      if (result.isValid === false) {
+        setScanError(result.organicControl || "Invalid Image: The uploaded photo does not appear to contain a plant, crop leaf, pest, or insect. Please upload a valid crop-related image.");
+        setScanResult(null);
+      } else {
+        setScanResult(result);
+      }
     } catch (err) {
-      setScanError("AI scan failed. Please try again.");
+      setScanError(`AI scan failed: ${err.message || "Please check your network and key configuration."}`);
+      setScanResult(null);
     } finally {
       setIsScanning(false);
     }
@@ -121,38 +175,189 @@ const PestAlert = () => {
 
   return (
     <div className="page-container">
-      <h2>Pest Management</h2>
-      <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.95rem' }}>
+      <h2 className="animate-slide-up">Pest Management</h2>
+      <p className="animate-slide-up delay-100" style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.95rem' }}>
         Identify crop pests and obtain treatment methods using Google Gemini AI diagnosis, or check regional outbreak reports.
       </p>
 
       {/* AI Diagnosis Section */}
-      <div className="ai-diagnosis-container">
+      <div className="ai-diagnosis-container animate-fade-in delay-150">
         
         {/* Upload Card */}
         <div className="ai-upload-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <h3>🔍 AI Pest Diagnosis</h3>
             
-            <div style={{ 
-              display: 'inline-flex', 
-              alignItems: 'center', 
-              gap: '0.4rem', 
-              padding: '0.25rem 0.5rem', 
-              borderRadius: '20px', 
-              backgroundColor: isGeminiConfigured ? 'rgba(56, 142, 60, 0.08)' : 'rgba(2, 136, 209, 0.08)', 
-              border: `1px solid ${isGeminiConfigured ? '#388e3c' : '#0288d1'}`, 
-              fontSize: '0.7rem', 
-              fontWeight: '600', 
-              color: isGeminiConfigured ? '#2e7d32' : '#01579b' 
-            }}>
-              <span className={isGeminiConfigured ? "live-pulse" : ""} style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: isGeminiConfigured ? '#388e3c' : '#0288d1', display: 'inline-block' }}></span>
-              {isGeminiConfigured ? 'Gemini AI Connected' : 'Offline AI Simulator'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {geminiConfigured ? (
+                <div style={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '0.4rem', 
+                  padding: '0.25rem 0.5rem', 
+                  borderRadius: '20px', 
+                  backgroundColor: 'rgba(56, 142, 60, 0.08)', 
+                  border: '1px solid #388e3c', 
+                  fontSize: '0.7rem', 
+                  fontWeight: '600', 
+                  color: '#2e7d32' 
+                }}>
+                  <span className="live-pulse" style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: '#388e3c', display: 'inline-block' }}></span>
+                  Gemini AI Active
+                </div>
+              ) : (
+                <div style={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '0.4rem', 
+                  padding: '0.25rem 0.5rem', 
+                  borderRadius: '20px', 
+                  backgroundColor: 'rgba(100, 100, 100, 0.08)', 
+                  border: '1px solid #777777', 
+                  fontSize: '0.7rem', 
+                  fontWeight: '600', 
+                  color: '#666666' 
+                }}>
+                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: '#777777', display: 'inline-block' }}></span>
+                  Simulation Mode (Offline)
+                </div>
+              )}
+              
+              <button 
+                type="button" 
+                onClick={() => {
+                  setShowConfig(!showConfig);
+                  setConfigFeedback(null);
+                }}
+                className="btn-config-toggle"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--primary-color)',
+                  cursor: 'pointer',
+                  fontSize: '0.78rem',
+                  fontWeight: '600',
+                  textDecoration: 'underline',
+                  padding: '0.25rem 0.5rem'
+                }}
+              >
+                {showConfig ? 'Hide Config' : 'Configure Key'}
+              </button>
             </div>
           </div>
           <p className="ai-description">
             Upload an image of a pest, insect, or leaf infection from your crop. Our model will identify it and output organic and chemical solutions.
           </p>
+
+          {showConfig && (
+            <div className="api-config-panel animate-slide-up" style={{
+              backgroundColor: 'var(--bg-color)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius)',
+              padding: '1rem',
+              marginBottom: '1.25rem',
+              marginTop: '-0.5rem'
+            }}>
+              <h4 style={{ fontSize: '0.85rem', marginBottom: '0.35rem', color: 'var(--text-color)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                🔑 Gemini API Key Settings
+              </h4>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: '1.4' }}>
+                Paste your Google Gemini API key to enable live crop leaf scan diagnostics. Get a key at <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)', fontWeight: '600', textDecoration: 'underline' }}>Google AI Studio</a>.
+              </p>
+              
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.65rem' }}>
+                <input 
+                  type={showApiKeyText ? 'text' : 'password'}
+                  placeholder="AIzaSy..."
+                  value={tempApiKey}
+                  onChange={(e) => setTempApiKey(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '0.45rem 0.6rem',
+                    borderRadius: '4px',
+                    border: '1px solid var(--border-color)',
+                    backgroundColor: 'var(--surface-color)',
+                    color: 'var(--text-color)',
+                    fontSize: '0.8rem',
+                    fontFamily: tempApiKey ? 'monospace' : 'inherit'
+                  }}
+                />
+                <button 
+                  type="button"
+                  onClick={() => setShowApiKeyText(!showApiKeyText)}
+                  style={{
+                    padding: '0.45rem',
+                    border: '1px solid var(--border-color)',
+                    backgroundColor: 'var(--surface-color)',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.85rem'
+                  }}
+                  title={showApiKeyText ? "Hide key" : "Show key"}
+                >
+                  {showApiKeyText ? '👁️' : '🔒'}
+                </button>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={handleSaveApiKey}
+                  disabled={isValidatingKey}
+                  style={{
+                    backgroundColor: 'var(--primary-color)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    padding: '0.4rem 0.8rem',
+                    fontSize: '0.78rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    opacity: isValidatingKey ? 0.7 : 1
+                  }}
+                >
+                  {isValidatingKey ? 'Verifying...' : 'Save & Verify'}
+                </button>
+                
+                {localStorage.getItem("VITE_GEMINI_API_KEY") && (
+                  <button
+                    type="button"
+                    onClick={handleClearApiKey}
+                    style={{
+                      backgroundColor: 'transparent',
+                      color: 'var(--error-color)',
+                      border: '1px solid var(--error-color)',
+                      borderRadius: '4px',
+                      padding: '0.4rem 0.8rem',
+                      fontSize: '0.78rem',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Clear Key
+                  </button>
+                )}
+              </div>
+              
+              {configFeedback && (
+                <div style={{ 
+                  marginTop: '0.55rem', 
+                  fontSize: '0.75rem', 
+                  fontWeight: '500',
+                  color: configFeedback.type === 'success' ? '#2e7d32' : 'var(--error-color)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.25rem'
+                }}>
+                  <span>{configFeedback.type === 'success' ? '✅' : '❌'}</span>
+                  <span>{configFeedback.message}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           <input 
             type="file" 
@@ -227,15 +432,24 @@ const PestAlert = () => {
           )}
 
           {!isScanning && scanResult && (
-            <div className="ai-result-grid">
+            <div className="ai-result-grid animate-slide-up" key={scanResult.name}>
               
               {/* Header */}
               <div className="ai-result-header">
-                <div className="ai-result-header-main">
+                <div className="ai-result-header-main" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <span className="ai-pest-title">{scanResult.name}</span>
                   <span className={`ai-severity-badge ${scanResult.severity.toLowerCase()}`}>
                     {scanResult.severity} Severity
                   </span>
+                  {scanResult.isSimulated && (
+                    <span className="ai-severity-badge" style={{
+                      backgroundColor: 'rgba(100, 100, 100, 0.08)',
+                      border: '1px solid #777777',
+                      color: '#666666'
+                    }}>
+                      Simulated Offline Result
+                    </span>
+                  )}
                 </div>
                 <span className="ai-pest-subtitle"><strong>Host Crop:</strong> {scanResult.crop}</span>
               </div>
@@ -276,8 +490,14 @@ const PestAlert = () => {
       
       {!loading && !error && (
         <div className="pest-grid">
-          {pests.map((pest) => (
-            <PestCard key={pest.id} pest={pest} />
+          {pests.map((pest, index) => (
+            <div 
+              key={pest.id} 
+              className="animate-slide-up" 
+              style={{ animationDelay: `${index * 80}ms` }}
+            >
+              <PestCard pest={pest} />
+            </div>
           ))}
         </div>
       )}

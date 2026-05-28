@@ -68,23 +68,6 @@ const Login = () => {
           <div className="login-logo">🌾</div>
           <h2 className="login-title">Smart Farmer Advisory</h2>
           <p className="login-subtitle">Agricultural Insights & Mandi Market Rates</p>
-          
-          <div style={{ 
-            display: 'inline-flex', 
-            alignItems: 'center', 
-            gap: '0.4rem', 
-            marginTop: '0.75rem',
-            padding: '0.3rem 0.6rem', 
-            borderRadius: '20px', 
-            backgroundColor: isFirebase ? 'rgba(56, 142, 60, 0.08)' : 'rgba(245, 127, 23, 0.08)', 
-            border: `1px solid ${isFirebase ? '#388e3c' : '#f57f17'}`, 
-            fontSize: '0.72rem', 
-            fontWeight: '600', 
-            color: isFirebase ? '#2e7d32' : '#e65100' 
-          }}>
-            <span className={isFirebase ? "live-pulse" : ""} style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: isFirebase ? '#388e3c' : '#f57f17', display: 'inline-block' }}></span>
-            {isFirebase ? 'Firebase Auth Mode Active' : 'Offline Local Fallback (Configure env for Firebase)'}
-          </div>
         </div>
 
         {/* Form Selector Tabs */}

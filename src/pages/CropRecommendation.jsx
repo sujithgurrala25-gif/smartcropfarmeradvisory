@@ -38,13 +38,13 @@ const CropRecommendation = () => {
 
   return (
     <div className="page-container">
-      <h2>Crop Recommendations</h2>
+      <h2 className="animate-slide-up">Crop Recommendations</h2>
       
       <Loader loading={loading} message="Loading crop models..." />
       
       {!loading && !error && (
-        <div className="crop-layout">
-          <Card title="Enter Field Details" className="crop-form-card">
+        <div className="crop-layout animate-fade-in">
+          <Card title="Enter Field Details" className="crop-form-card animate-slide-in-left">
             <form onSubmit={handleSearch}>
               <div className="form-group">
                 <label>Soil Type:</label>
@@ -61,21 +61,29 @@ const CropRecommendation = () => {
                   <option value="Winter">Winter (Rabi)</option>
                 </select>
               </div>
-              <button type="submit" className="btn btn-primary">Get Suggestions</button>
+              <button type="submit" className="btn btn-primary glow-on-hover w-100">Get Suggestions</button>
             </form>
           </Card>
           
           <div className="crop-results">
             {suggestions.length > 0 ? (
-              <Card title="Recommended Crops">
+              <Card title="Recommended Crops" className="animate-slide-in-right">
                 <ul className="crop-list">
                   {suggestions.map((crop, index) => (
-                    <li key={index}>{crop}</li>
+                    <li 
+                      key={index} 
+                      className="animate-slide-up"
+                      style={{ animationDelay: `${index * 70}ms` }}
+                    >
+                      {crop}
+                    </li>
                   ))}
                 </ul>
               </Card>
             ) : (
-              <p className="no-data">Select parameters and click Get Suggestions to see crops.</p>
+              <p className="no-data animate-fade-in" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                Select parameters and click Get Suggestions to see crops.
+              </p>
             )}
           </div>
         </div>

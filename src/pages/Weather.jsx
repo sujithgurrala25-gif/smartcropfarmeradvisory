@@ -160,9 +160,9 @@ const Weather = () => {
 
   return (
     <div className="page-container">
-      <h2>Weather Updates</h2>
+      <h2 className="animate-slide-up">Weather Updates</h2>
       
-      <form onSubmit={handleSearch} className="weather-search-container">
+      <form onSubmit={handleSearch} className="weather-search-container animate-slide-up delay-100">
         <input
           type="text"
           className="weather-search-input"
@@ -171,7 +171,7 @@ const Weather = () => {
           placeholder="Search for a city (e.g. Hyderabad, Delhi)..."
           disabled={loading || searching}
         />
-        <button type="submit" className="btn btn-primary" disabled={loading || searching}>
+        <button type="submit" className="btn btn-primary glow-on-hover" disabled={loading || searching}>
           {searching ? 'Searching...' : 'Search'}
         </button>
         <button
@@ -190,7 +190,7 @@ const Weather = () => {
       <Loader loading={loading} message="Fetching real-time weather data..." />
       
       {!loading && weatherData && (
-        <div className="weather-container">
+        <div className="weather-container animate-fade-in delay-150">
           <div className="weather-location-title">
             📍 {locationName}
           </div>
@@ -199,7 +199,9 @@ const Weather = () => {
               Last updated: {lastUpdated} (auto-refreshing lively)
             </small>
           )}
-          <WeatherCard data={weatherData} />
+          <div className="animate-slide-up delay-250" style={{ maxWidth: '420px' }}>
+            <WeatherCard data={weatherData} />
+          </div>
         </div>
       )}
     </div>

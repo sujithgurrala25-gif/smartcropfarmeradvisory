@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { fetchMarketPrices, refreshMarketPrices, generateHistoricalTrend, fetchPreviousMarketPrices } from '../utils/api';
+import { fetchMarketPrices, refreshMarketPrices, generateHistoricalTrend, fetchPreviousMarketPrices, baselinePrices } from '../utils/api';
 import Loader from '../components/Loader';
 import Card from '../components/Card';
 
@@ -37,26 +37,41 @@ const MarketPrice = () => {
   const [selectedCrop, setSelectedCrop] = useState('All');
   const [selectedRowId, setSelectedRowId] = useState(null);
 
+  const loadData = async (isMounted) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = !marketStatus.isOpen
+        ? await fetchPreviousMarketPrices()
+        : await fetchMarketPrices();
+      if (isMounted) {
+        setPrices(data);
+        if (data.length > 0) {
+          setSelectedRowId(data[0].id);
+        }
+      }
+    } catch (err) {
+      if (isMounted) {
+        // Load local baseline fallback data
+        const fallback = baselinePrices.map(item => ({
+          ...item,
+          lastUpdated: !marketStatus.isOpen ? 'Saturday (Closing)' : new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          isLive: false
+        }));
+        setPrices(fallback);
+        if (fallback.length > 0) {
+          setSelectedRowId(fallback[0].id);
+        }
+        setError(`Failed to sync live rates: ${err.message}. Showing local offline rates.`);
+      }
+    } finally {
+      if (isMounted) setLoading(false);
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
-    const getPrices = async () => {
-      try {
-        const data = !marketStatus.isOpen
-          ? await fetchPreviousMarketPrices()
-          : await fetchMarketPrices();
-        if (isMounted) {
-          setPrices(data);
-          if (data.length > 0) {
-            setSelectedRowId(data[0].id);
-          }
-        }
-      } catch (err) {
-        if (isMounted) setError('Failed to fetch market prices.');
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-    getPrices();
+    loadData(isMounted);
     return () => { isMounted = false; };
   }, [marketStatus.isOpen]);
 
@@ -78,7 +93,7 @@ const MarketPrice = () => {
       setPrices(updatedData);
       setShowingPreviousRates(false);
     } catch (err) {
-      setError('Failed to refresh live market prices.');
+      setError(`Failed to refresh live market prices: ${err.message}`);
     } finally {
       setRefreshing(false);
     }
@@ -93,7 +108,7 @@ const MarketPrice = () => {
       setPrices(data);
       setShowingPreviousRates(true);
     } catch (err) {
-      setError('Failed to load previous market prices.');
+      setError(`Failed to load previous market prices: ${err.message}`);
     } finally {
       setRefreshing(false);
     }
@@ -119,17 +134,14 @@ const MarketPrice = () => {
   const fallbackPrices = useMemo(() => {
     if (filteredPrices.length > 0) return [];
 
-    // Fallback: If a specific crop was filtered, show this crop's prices from other mandis
     if (selectedCrop !== 'All') {
       return prices.filter((p) => p.crop === selectedCrop);
     }
 
-    // Fallback: If a specific mandi was filtered, show all crops active in this mandi
     if (selectedMandi !== 'All') {
       return prices.filter((p) => p.mandi === selectedMandi);
     }
 
-    // Fallback: If search term is present but empty results, show matches on crop name
     if (searchTerm) {
       const match = prices.filter(p => p.crop.toLowerCase().includes(searchTerm.toLowerCase()));
       if (match.length > 0) return match;
@@ -154,7 +166,6 @@ const MarketPrice = () => {
     const activeMarkets = new Set(prices.map((p) => p.mandi)).size;
     const totalArrivals = prices.reduce((sum, p) => sum + p.arrivals, 0);
 
-    // Simple heuristic for top gainer: a crop with "Up" trend and highest max price
     const gainers = prices.filter((p) => p.trend === 'Up');
     let topGainer = 'N/A';
     if (gainers.length > 0) {
@@ -163,7 +174,6 @@ const MarketPrice = () => {
       );
       topGainer = `${highestPriceGainer.crop} (${highestPriceGainer.mandi})`;
     } else {
-      // fallback to highest modal price crop
       const highest = prices.reduce((prev, current) =>
         prev.modalPrice > current.modalPrice ? prev : current
       );
@@ -194,12 +204,10 @@ const MarketPrice = () => {
       return { x, y, value: val, day: `Day ${idx + 1}` };
     });
 
-    // Create line path SVG command
     const linePathStr = pointsList.reduce((acc, p, idx) => {
       return acc + `${idx === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
     }, '');
 
-    // Create closed area path SVG command
     const firstPoint = pointsList[0];
     const lastPoint = pointsList[pointsList.length - 1];
     const yBaseline = height - padding.bottom;
@@ -207,7 +215,6 @@ const MarketPrice = () => {
       ? `${linePathStr} L ${lastPoint.x.toFixed(1)} ${yBaseline} L ${firstPoint.x.toFixed(1)} ${yBaseline} Z`
       : '';
 
-    // Helper grid lines (y axis levels)
     const gridLevels = 3;
     const gridLinesList = [];
     for (let i = 0; i < gridLevels; i++) {
@@ -257,14 +264,22 @@ const MarketPrice = () => {
   return (
     <div className="page-container">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-        <h2 style={{ margin: 0 }}>Telangana Agriculture Market Prices (Agmarknet Live)</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.8rem', borderRadius: '20px', backgroundColor: isLiveDataActive ? 'rgba(56, 142, 60, 0.08)' : 'rgba(245, 127, 23, 0.08)', border: `1px solid ${isLiveDataActive ? '#388e3c' : '#f57f17'}`, fontSize: '0.82rem', fontWeight: '600', color: isLiveDataActive ? '#2e7d32' : '#e65100' }}>
-          <span className={isLiveDataActive ? "live-pulse" : ""} style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: isLiveDataActive ? '#388e3c' : '#f57f17', display: 'inline-block' }}></span>
-          {isLiveDataActive ? 'Live Agmarknet Sync Active' : 'Offline Verified Simulation (Configure VITE_DATA_GOV_IN_API_KEY for Live Sync)'}
+        <h2 style={{ margin: 0 }}>Telangana Agriculture Market Prices (Live Agmarknet Sync)</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {isLiveDataActive && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.8rem', borderRadius: '20px', backgroundColor: 'rgba(56, 142, 60, 0.08)', border: '1px solid #388e3c', fontSize: '0.82rem', fontWeight: '600', color: '#2e7d32' }}>
+              <span className="live-pulse" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#388e3c', display: 'inline-block' }}></span>
+              Live Daily Market Index Sync Active
+            </div>
+          )}
         </div>
       </div>
 
-      {error && <p className="error-message">{error}</p>}
+      {error && (
+        <div className="error-message">
+          <span>⚠️ {error}</span>
+        </div>
+      )}
 
       {!marketStatus.isOpen && (
         <div className="info-message holiday-banner" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', backgroundColor: 'rgba(2, 136, 209, 0.08)', borderColor: '#0288d1', color: '#0277bd', padding: '1rem', borderRadius: 'var(--radius)', marginBottom: '1.5rem', fontWeight: '500' }}>
@@ -279,7 +294,7 @@ const MarketPrice = () => {
         <>
           {/* Summary Cards */}
           <div className="market-metrics-grid">
-            <div className="metric-card primary-border">
+            <div className="metric-card primary-border animate-slide-up delay-100">
               <div className="metric-header">
                 <span className="metric-title">Active Mandis</span>
                 <span className="metric-icon">🏢</span>
@@ -288,7 +303,7 @@ const MarketPrice = () => {
               <div className="metric-subtitle">Telangana Regulated Markets</div>
             </div>
 
-            <div className="metric-card success-border">
+            <div className="metric-card success-border animate-slide-up delay-150">
               <div className="metric-header">
                 <span className="metric-title">Highest Demand Crop</span>
                 <span className="metric-icon">🚀</span>
@@ -297,7 +312,7 @@ const MarketPrice = () => {
               <div className="metric-subtitle">Currently Trending Upwards</div>
             </div>
 
-            <div className="metric-card accent-border">
+            <div className="metric-card accent-border animate-slide-up delay-200">
               <div className="metric-header">
                 <span className="metric-title">Total Daily Arrivals</span>
                 <span className="metric-icon">🚛</span>
@@ -308,7 +323,7 @@ const MarketPrice = () => {
           </div>
 
           {/* Search & Filter Bar */}
-          <div className="market-filter-bar">
+          <div className="market-filter-bar animate-slide-up delay-250">
             <div className="search-wrapper">
               <span className="search-icon">🔍</span>
               <input
@@ -325,7 +340,7 @@ const MarketPrice = () => {
               value={selectedMandi}
               onChange={(e) => {
                 setSelectedMandi(e.target.value);
-                setSelectedRowId(null); // Reset selection on filter
+                setSelectedRowId(null);
               }}
             >
               <option value="All">All Mandis</option>
@@ -339,7 +354,7 @@ const MarketPrice = () => {
               value={selectedCrop}
               onChange={(e) => {
                 setSelectedCrop(e.target.value);
-                setSelectedRowId(null); // Reset selection on filter
+                setSelectedRowId(null);
               }}
             >
               <option value="All">All Crops</option>
@@ -371,7 +386,7 @@ const MarketPrice = () => {
           </div>
 
           {/* Main Content Layout */}
-          <div className="market-page-layout">
+          <div className="market-page-layout animate-fade-in delay-300">
 
             {/* Market Prices Table Card */}
             <Card title="Today's Mandi Wholesale Rates (per Quintal / 100 Kg)">
@@ -445,7 +460,7 @@ const MarketPrice = () => {
             {/* Details and Analytics Side Panel */}
             <div>
               {selectedItem ? (
-                <div className="market-detail-panel">
+                <div className="market-detail-panel animate-slide-in-right" key={selectedItem.id}>
                   <div className="detail-header">
                     <h3>{selectedItem.crop}</h3>
                     <span>{selectedItem.variety} Variety • {selectedItem.mandi} Mandi</span>
@@ -477,7 +492,7 @@ const MarketPrice = () => {
                   <div className="detail-stat-row">
                     <span>Last Updated</span>
                     <span style={{ color: 'var(--primary-color)' }}>
-                      {selectedItem.lastUpdated === 'Saturday (Closing)' || !marketStatus.isOpen ? selectedItem.lastUpdated : `${selectedItem.lastUpdated} Today`}
+                      {selectedItem.lastUpdated}
                     </span>
                   </div>
 
@@ -486,7 +501,6 @@ const MarketPrice = () => {
                     <div className="chart-title">7-Day Price Trend (₹ / Qtl)</div>
                     <div className="chart-svg-wrapper">
                       <svg viewBox="0 0 300 120" width="100%" height="120">
-                        {/* Grid lines */}
                         {gridLines.map((gl, i) => (
                           <g key={i}>
                             <line
@@ -506,21 +520,17 @@ const MarketPrice = () => {
                           </g>
                         ))}
 
-                        {/* Axes */}
                         <line x1="35" y1="15" x2="35" y2="100" className="chart-axis-line" />
                         <line x1="35" y1="100" x2="280" y2="100" className="chart-axis-line" />
 
-                        {/* Area under the line */}
                         {chartAreaPath && (
                           <path d={chartAreaPath} className="chart-area" />
                         )}
 
-                        {/* Trend path */}
                         {chartPath && (
                           <path d={chartPath} className="chart-line" />
                         )}
 
-                        {/* Points */}
                         {points.map((p, idx) => (
                           <g key={idx}>
                             <circle
@@ -529,7 +539,6 @@ const MarketPrice = () => {
                               r="4"
                               className="chart-dot"
                             />
-                            {/* Label for last point to display current modal rate */}
                             {idx === points.length - 1 && (
                               <text
                                 x={p.x - 30}
@@ -542,7 +551,6 @@ const MarketPrice = () => {
                           </g>
                         ))}
 
-                        {/* Day labels at bottom */}
                         <text x="35" y="112" className="chart-text">D-6</text>
                         <text x="75" y="112" className="chart-text">D-5</text>
                         <text x="115" y="112" className="chart-text">D-4</text>
@@ -554,7 +562,6 @@ const MarketPrice = () => {
                     </div>
                   </div>
 
-                  {/* Advisory Box */}
                   {advisoryContent && (
                     <div className={`advisory-box ${advisoryContent.className}`}>
                       <div className="advisory-title">{advisoryContent.title}</div>

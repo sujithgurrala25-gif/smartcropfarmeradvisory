@@ -1,12 +1,22 @@
 // Google Gemini AI integration for Pest Diagnosis
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+export const getGeminiApiKey = () => {
+  const storedKey = localStorage.getItem("VITE_GEMINI_API_KEY");
+  if (storedKey && storedKey.trim() !== "" && storedKey !== 'your_gemini_api_key_here') {
+    return storedKey.trim();
+  }
+  const envKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (envKey && envKey.trim() !== "" && envKey !== 'your_gemini_api_key_here') {
+    return envKey.trim();
+  }
+  return "";
+};
 
-// Check if Gemini API is configured and is not the default placeholder
-export const isGeminiConfigured = 
-  !!GEMINI_API_KEY && 
-  GEMINI_API_KEY !== 'your_gemini_api_key_here' && 
-  GEMINI_API_KEY !== '';
+// Check if Gemini API is configured
+export const isGeminiConfigured = () => {
+  const key = getGeminiApiKey();
+  return !!key;
+};
 
 // Curated database of common Indian/Telangana pests for local fallback simulation
 const mockPestsDb = [
@@ -58,22 +68,67 @@ const mockPestsDb = [
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
+ * Tests a Gemini API key using a lightweight query
+ * @param {string} key - The Gemini API key to test
+ * @returns {Promise<boolean>}
+ */
+export const testGeminiApiKey = async (key) => {
+  if (!key) throw new Error("API key is empty");
+  
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+  const payload = {
+    contents: [
+      {
+        parts: [
+          {
+            text: "Respond with exactly the word 'OK' if you can read this."
+          }
+        ]
+      }
+    ]
+  };
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData?.error?.message || `HTTP error ${response.status}`;
+    throw new Error(message);
+  }
+
+  const data = await response.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) {
+    throw new Error("No response from Gemini API");
+  }
+  return true;
+};
+
+/**
  * Analyzes a base64 encoded image with Gemini AI or falls back to a realistic simulation
  * @param {string} base64Data - Base64 data string (excluding the mime header)
  * @param {string} mimeType - Image mime type (e.g. image/jpeg, image/png)
- * @returns {Promise<{name: string, crop: string, severity: string, organicControl: string, chemicalControl: string}>}
+ * @returns {Promise<{isValid: boolean, name: string, crop: string, severity: string, organicControl: string, chemicalControl: string}>}
  */
 export const analyzePestPhoto = async (base64Data, mimeType) => {
-  if (isGeminiConfigured) {
+  const apiKey = getGeminiApiKey();
+  
+  if (apiKey) {
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
       
       const payload = {
         contents: [
           {
             parts: [
               {
-                text: "Analyze this image of a crop disease or pest. You are an expert agricultural botanist. Respond ONLY with a valid JSON object matching the following JSON schema. Do not enclose the JSON inside markdown codeblocks (no ```json). The schema is:\n{\n  \"name\": \"Name of the pest or crop disease\",\n  \"crop\": \"Host crop affected\",\n  \"severity\": \"Low, Medium, or High depending on the potential damage\",\n  \"organicControl\": \"Detailed organic control methods and home remedies for farmers\",\n  \"chemicalControl\": \"Detailed chemical control methods and pesticides to use safely\"\n}"
+                text: "CRITICAL INSTRUCTION: Analyze the uploaded image carefully. You must first verify if the image represents an agricultural plant, crop, leaf, field, or a crop pest/insect/infection. If the image is NOT related to agriculture/plants (for example: if it is a photo of a human face/selfie, a pet, a car, household items, furniture, plain text, documents, screenshots, cartoons, or random objects), you MUST set \"isValid\" to false in the JSON response. Do NOT attempt to provide diagnostic results or fake names for unrelated objects. Only set \"isValid\" to true if a plant, crop leaf, or agricultural pest is clearly visible. Respond ONLY with a valid JSON object matching the following schema. Do not enclose inside markdown codeblocks. The schema is:\n{\n  \"isValid\": true/false,\n  \"name\": \"Name of the pest or crop disease, or 'Invalid Image' if isValid is false\",\n  \"crop\": \"Host crop affected, or 'N/A' if isValid is false\",\n  \"severity\": \"Low, Medium, or High, or 'N/A' if isValid is false\",\n  \"organicControl\": \"Detailed organic control methods for farmers, or a helpful message explaining what is wrong with the image if isValid is false\",\n  \"chemicalControl\": \"Detailed chemical control methods to use safely, or a helpful message explaining what is wrong with the image if isValid is false\"\n}"
               },
               {
                 inlineData: {
@@ -98,7 +153,9 @@ export const analyzePestPhoto = async (base64Data, mimeType) => {
       });
 
       if (!response.ok) {
-        throw new Error(`Gemini API responded with status ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        const message = errorData?.error?.message || `Gemini API responded with status ${response.status}`;
+        throw new Error(message);
       }
 
       const responseData = await response.json();
@@ -108,10 +165,28 @@ export const analyzePestPhoto = async (base64Data, mimeType) => {
         throw new Error("Empty response from Gemini AI model");
       }
 
-      const parsedData = JSON.parse(textResponse.trim());
+      // Robust cleaning of markdown JSON code block wrappers
+      let cleanText = textResponse.trim();
+      if (cleanText.includes("```")) {
+        const jsonMatch = cleanText.match(/```(?:json)?([\s\S]*?)```/);
+        if (jsonMatch && jsonMatch[1]) {
+          cleanText = jsonMatch[1].trim();
+        } else {
+          cleanText = cleanText.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+        }
+      }
+
+      let parsedData;
+      try {
+        parsedData = JSON.parse(cleanText);
+      } catch (parseError) {
+        console.error("Failed to parse Gemini response as JSON. Cleaned response was:", cleanText, parseError);
+        throw new Error("Failed to parse AI response. The model output was not valid JSON.");
+      }
       
       // Ensure all fields exist
       return {
+        isValid: parsedData.isValid !== false,
         name: parsedData.name || "Unknown Crop Pest",
         crop: parsedData.crop || "Unknown Crop",
         severity: parsedData.severity || "Medium",
@@ -120,14 +195,17 @@ export const analyzePestPhoto = async (base64Data, mimeType) => {
       };
 
     } catch (error) {
-      console.error("Gemini AI API call failed, falling back to simulation:", error);
-      await delay(2000); // Simulate network latency
-      // Failover to a random mock database item
-      return mockPestsDb[Math.floor(Math.random() * mockPestsDb.length)];
+      console.error("Gemini AI API call failed:", error);
+      throw error;
     }
   } else {
     // Offline local simulation fallback mode
     await delay(2000); // Simulate AI loading state
-    return mockPestsDb[Math.floor(Math.random() * mockPestsDb.length)];
+    const randomPest = mockPestsDb[Math.floor(Math.random() * mockPestsDb.length)];
+    return {
+      ...randomPest,
+      isValid: true,
+      isSimulated: true
+    };
   }
 };

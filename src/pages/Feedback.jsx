@@ -50,10 +50,10 @@ const Feedback = () => {
 
   return (
     <div className="page-container">
-      <h2>Farmer Feedback</h2>
+      <h2 className="animate-slide-up">Farmer Feedback</h2>
       
-      <div className="feedback-layout">
-        <Card title="Leave a Feedback" className="feedback-form-card">
+      <div className="feedback-layout animate-fade-in delay-100">
+        <Card title="Leave a Feedback" className="feedback-form-card animate-slide-in-left">
           {message && <div className="info-message">{message}</div>}
           <form onSubmit={handleSubmit}>
             <div className="form-group">
@@ -84,21 +84,27 @@ const Feedback = () => {
                 rows="4"
               ></textarea>
             </div>
-            <button type="submit" className="btn btn-primary">Submit Feedback</button>
+            <button type="submit" className="btn btn-primary glow-on-hover w-100">Submit Feedback</button>
           </form>
         </Card>
         
         <div className="feedback-list">
           <h3>Recent Feedbacks</h3>
           {feedbacks.length === 0 ? (
-            <p>No feedbacks yet. Be the first!</p>
+            <p className="animate-fade-in" style={{ color: 'var(--text-muted)', fontStyle: 'italic', padding: '1rem 0' }}>No feedbacks yet. Be the first!</p>
           ) : (
-            feedbacks.map((fb) => (
-              <Card key={fb.id} className="feedback-item">
-                <p><strong>{fb.name}</strong> - Rating: {fb.rating}/5</p>
-                <p>"{fb.comment}"</p>
-                <small>{fb.date}</small>
-              </Card>
+            feedbacks.map((fb, index) => (
+              <div 
+                key={fb.id} 
+                className="animate-slide-up" 
+                style={{ animationDelay: `${index * 70}ms` }}
+              >
+                <Card className="feedback-item">
+                  <p><strong>{fb.name}</strong> - Rating: {fb.rating}/5</p>
+                  <p>"{fb.comment}"</p>
+                  <small>{fb.date}</small>
+                </Card>
+              </div>
             ))
           )}
         </div>
